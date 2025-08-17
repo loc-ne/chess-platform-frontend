@@ -48,7 +48,7 @@ const LoginPage: React.FC = () => {
       const result = await response.json();
 
       if (response.ok) {
-        setUser(result.user);
+        setUser(result.data);
         
         router.replace('/play/online');
       } else {

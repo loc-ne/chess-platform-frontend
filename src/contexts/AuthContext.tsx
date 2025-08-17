@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
 }
@@ -46,11 +46,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const data = await response.json();
-    if (data.success) {
-      setUser(data.user);
-    } else {
-      setUser(null);
-    }
+    
+    setUser(data.data);
+
   } catch (error) {
     setUser(null);
     console.log("error auth: ", error);

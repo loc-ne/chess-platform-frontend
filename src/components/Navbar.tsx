@@ -18,7 +18,7 @@ import {
 
 interface NavbarProps {
   user?: {
-    id: string;
+    id: number;
     username: string;
     email: string;
   } | null;
