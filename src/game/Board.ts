@@ -1007,7 +1007,7 @@ export const ChessEngine = {
         if (isWhite && !state.castlingRights.whiteKingSide) return false;
         if (!isWhite && !state.castlingRights.blackKingSide) return false;
 
-        const kingRow = isWhite ? 7 : 0;
+        const kingRow = isWhite ? 0 : 7;
         const rookCol = 7;
 
         // Check if squares between king and rook are empty
@@ -1047,7 +1047,7 @@ export const ChessEngine = {
         if (isWhite && !state.castlingRights.whiteQueenSide) return false;
         if (!isWhite && !state.castlingRights.blackQueenSide) return false;
 
-        const kingRow = isWhite ? 7 : 0;
+        const kingRow = isWhite ? 0 : 7;
         const rookCol = 0;
 
         // Check if squares between king and rook are empty

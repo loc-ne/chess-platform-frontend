@@ -11,10 +11,9 @@ import ReplayControls from '@/components/ReplayControls';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientGameState, GameStateManager } from '@/game/GameState';
-import { BitboardGame as LocalBitboardGame } from '@/game/Board';
+import { BitboardGame } from '@/game/Board';
 import { Position } from '@/game/types';
 
-// Types phù hợp với backend
 interface PlayerData {
   userId: number;
   username: string;
@@ -23,35 +22,10 @@ interface PlayerData {
   isOnline: boolean;
 }
 
-interface CastlingRights {
-  whiteKingSide: boolean;
-  whiteQueenSide: boolean;
-  blackKingSide: boolean;
-  blackQueenSide: boolean;
-}
-
-interface WSPosition {
-  row: number;
-  col: number;
-}
-
-interface BitboardGame {
-  white: any;
-  black: any;
-}
-
-interface WSClientGameState {
-  currentFen: string;
-  bitboards: BitboardGame;
-  activeColor: 'white' | 'black';
-  castlingRights: CastlingRights;
-  enPassantSquare: WSPosition | null;
-}
-
 interface WSStateUpdateMessage {
   type: string;
   roomId: string;
-  gameState?: WSClientGameState;
+  gameState?: ClientGameState;
   player1?: PlayerData;
   player2?: PlayerData;
   whiteTimeLeft?: number;
@@ -59,6 +33,10 @@ interface WSStateUpdateMessage {
   error?: string;
   result?: string;
   reason?: string;
+  winner?: string;
+  offerId?: string;
+  offerFrom?: number;
+  moveHistory?: MoveHistoryItem[];
 }
 
 interface MoveHistoryItem {
@@ -76,12 +54,12 @@ interface MoveHistoryProps {
 }
 
 // Convert functions
-function convertBitboardsToBigInt(bitboards: BitboardGame): LocalBitboardGame {
+function convertBitboardsToBigInt(bitboards: BitboardGame): BitboardGame {
   const keys = [
     'WhitePawns', 'WhiteRooks', 'WhiteKnights', 'WhiteBishops', 'WhiteQueens', 'WhiteKing',
     'BlackPawns', 'BlackRooks', 'BlackKnights', 'BlackBishops', 'BlackQueens', 'BlackKing'
   ];
-  const result: LocalBitboardGame = {
+  const result: BitboardGame = {
     whitePawns: BigInt(0),
     whiteRooks: BigInt(0),
     whiteKnights: BigInt(0),
@@ -97,15 +75,15 @@ function convertBitboardsToBigInt(bitboards: BitboardGame): LocalBitboardGame {
   };
   for (const key of keys) {
     const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
-    result[camelKey as keyof LocalBitboardGame] =
-  bitboards && typeof bitboards === 'object' && bitboards[key as keyof BitboardGame] !== undefined
-    ? BigInt(bitboards[key as keyof BitboardGame])
-    : BigInt(0);
+    result[camelKey as keyof BitboardGame] =
+      bitboards && typeof bitboards === 'object' && bitboards[key as keyof BitboardGame] !== undefined
+        ? BigInt(bitboards[key as keyof BitboardGame])
+        : BigInt(0);
   }
   return result;
 }
 
-function convertWSGameStateToClient(wsGameState: WSClientGameState): ClientGameState {
+function convertWSGameStateToClient(wsGameState: ClientGameState): ClientGameState {
   return {
     currentFen: wsGameState.currentFen,
     bitboards: convertBitboardsToBigInt(wsGameState.bitboards),
@@ -192,16 +170,16 @@ const MoveHistory: React.FC<MoveHistoryProps> = ({
                   <div className="text-gray-500 font-mono">{move.moveNumber}.</div>
                   <div
                     className={`font-mono text-gray-800 rounded mr-2 ${indexMoveHistory !== 0 && indexMoveHistory === whiteMoveIndex
-                        ? 'bg-blue-400 font-bold shadow border border-yellow-600'
-                        : ''
+                      ? 'bg-blue-400 font-bold shadow border border-yellow-600'
+                      : ''
                       }`}
                   >
                     {move.white}
                   </div>
                   <div
                     className={`font-mono text-gray-800 rounded ${indexMoveHistory !== 0 && indexMoveHistory === blackMoveIndex
-                        ? 'bg-blue-400 font-bold shadow border border-yellow-600'
-                        : ''
+                      ? 'bg-blue-400 font-bold shadow border border-yellow-600'
+                      : ''
                       }`}
                   >
                     {move.black || ''}
@@ -226,6 +204,129 @@ const MoveHistory: React.FC<MoveHistoryProps> = ({
   );
 };
 
+const ConfirmTooltip: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  confirmButtonClass?: string;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+}> = ({
+  isOpen,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = "Xác nhận",
+  cancelText = "Hủy",
+  confirmButtonClass = "bg-red-500 hover:bg-red-600",
+  position = 'right'
+}) => {
+    if (!isOpen) return null;
+
+    const positionClasses = {
+      top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2',
+      bottom: 'top-full left-1/2 transform -translate-x-1/2 mt-2',
+      left: 'right-full top-1/2 transform -translate-y-1/2 mr-2',
+      right: 'left-full top-1/2 transform -translate-y-1/2 ml-2'
+    };
+
+    const arrowClasses = {
+      top: 'top-full left-1/2 transform -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-white',
+      bottom: 'bottom-full left-1/2 transform -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-white',
+      left: 'left-full top-1/2 transform -translate-y-1/2 border-t-transparent border-b-transparent border-r-transparent border-l-white',
+      right: 'right-full top-1/2 transform -translate-y-1/2 border-t-transparent border-b-transparent border-l-transparent border-r-white'
+    };
+
+    return (
+      <div className={`absolute ${positionClasses[position]} z-50`}>
+        <div
+          className={`absolute ${arrowClasses[position]} w-0 h-0 border-8`}
+          style={{ zIndex: 51 }}
+        />
+
+        <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 min-w-[280px] max-w-[320px]">
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">{title}</h4>
+          <p className="text-xs text-gray-600 mb-4">{message}</p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={onCancel}
+              className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded transition-colors"
+            >
+              {cancelText}
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`px-3 py-1.5 ${confirmButtonClass} text-white text-xs font-medium rounded transition-colors`}
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+const DrawOfferDialog: React.FC<{
+  isOpen: boolean;
+  offerFromUsername: string;
+  onAccept: () => void;
+  onDecline: () => void;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+}> = ({ isOpen, offerFromUsername, onAccept, onDecline, position = 'right' }) => {
+  if (!isOpen) return null;
+
+  const positionClasses = {
+    top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2',
+    bottom: 'top-full left-1/2 transform -translate-x-1/2 mt-2',
+    left: 'right-full top-1/2 transform -translate-y-1/2 mr-2',
+    right: 'left-full top-1/2 transform -translate-y-1/2 ml-2'
+  };
+
+  const arrowClasses = {
+    top: 'top-full left-1/2 transform -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-white',
+    bottom: 'bottom-full left-1/2 transform -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-white',
+    left: 'left-full top-1/2 transform -translate-y-1/2 border-t-transparent border-b-transparent border-r-transparent border-l-white',
+    right: 'right-full top-1/2 transform -translate-y-1/2 border-t-transparent border-b-transparent border-l-transparent border-r-white'
+  };
+
+  return (
+    <div className={`absolute ${positionClasses[position]} z-50`}>
+      {/* Arrow */}
+      <div
+        className={`absolute ${arrowClasses[position]} w-0 h-0 border-8`}
+        style={{ zIndex: 51 }}
+      />
+
+      {/* Modal content */}
+      <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 min-w-[320px] max-w-[380px]">
+        <h3 className="text-base font-bold text-gray-900 mb-3">Đề nghị hòa</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          <span className="font-semibold text-blue-600">{offerFromUsername}</span> đã đề nghị hòa.
+          Bạn có muốn chấp nhận không?
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onDecline}
+            className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded transition-colors"
+          >
+            Từ chối
+          </button>
+          <button
+            onClick={onAccept}
+            className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded transition-colors"
+          >
+            Chấp nhận
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const GamePage: React.FC = () => {
   const params = useParams();
   const gameId = params?.gameId as string;
@@ -244,23 +345,23 @@ const GamePage: React.FC = () => {
   const [indexMoveHistory, setIndexMoveHistory] = React.useState<number>(0);
   const [wsConnected, setWsConnected] = React.useState(false);
 
+  const [showResignConfirm, setShowResignConfirm] = React.useState(false);
+  const [showDrawConfirm, setShowDrawConfirm] = React.useState(false);
+  const [pendingDrawOffer, setPendingDrawOffer] = React.useState<{ offerId: string; offerFrom: number } | null>(null);
+  const [showDrawOfferDialog, setShowDrawOfferDialog] = React.useState(false);
+
   const ws = React.useRef<WebSocket | null>(null);
 
   // WebSocket connection
   React.useEffect(() => {
     if (!gameId || !user?.id) return;
 
-    console.log(`🔌 Connecting to WebSocket for game: ${gameId}`);
-
-    // Kết nối WebSocket theo backend mới
     ws.current = new WebSocket('ws://localhost:3005/ws');
 
     ws.current.onopen = () => {
-      console.log('✅ WebSocket connected');
       setWsConnected(true);
       setError(null);
 
-      // ✅ CHỈ GỬI MESSAGE KHI ĐÃ CONNECTED
       const joinMessage = {
         type: 'joinRoom',
         roomId: gameId,
@@ -268,8 +369,6 @@ const GamePage: React.FC = () => {
         username: user.username || `User${user.id}`
       };
 
-      console.log('📤 Sending joinRoom:', joinMessage);
-      // Đảm bảo WebSocket đã sẵn sàng trước khi gửi
       if (ws.current && ws.current.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify(joinMessage));
       }
@@ -278,31 +377,32 @@ const GamePage: React.FC = () => {
     ws.current.onmessage = (event) => {
       try {
         const message: WSStateUpdateMessage = JSON.parse(event.data);
-        console.log('📥 Received message:', message);
-
         switch (message.type) {
           case 'gameState':
-            console.log('🎮 Initial game state received');
             handleGameStateMessage(message);
             break;
 
           case 'gameUpdate':
-            console.log('🔄 Game state updated');
             handleGameUpdateMessage(message);
             break;
 
           case 'error':
-            console.error('❌ Game error:', message.error);
             setError(message.error || 'Unknown error');
             break;
 
           case 'gameEnd':
-            console.log('🏁 Game ended');
             handleGameEndMessage(message);
             break;
 
+          case 'drawOffer':
+            handleDrawOfferMessage(message);
+            break;
+
+          case 'drawDeclined':
+            handleDrawDeclinedMessage(message);
+            break;
           default:
-            console.log('❓ Unknown message type:', message.type);
+            console.log('Unknown message type:', message.type);
         }
       } catch (err) {
         console.error('Error parsing WebSocket message:', err);
@@ -310,20 +410,10 @@ const GamePage: React.FC = () => {
     };
 
     ws.current.onclose = (event) => {
-      console.log('❌ WebSocket closed:', event.code, event.reason);
       setWsConnected(false);
-
-      // Auto-reconnect sau 3 giây nếu không phải do lỗi server
-      if (event.code !== 1000 && event.code !== 1001) {
-        setTimeout(() => {
-          console.log('🔄 Attempting to reconnect...');
-          // Trigger reconnect bằng cách re-run effect
-        }, 3000);
-      }
     };
 
     ws.current.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
       setError('Connection error. Please check your network.');
       setWsConnected(false);
     };
@@ -335,12 +425,10 @@ const GamePage: React.FC = () => {
     };
   }, [gameId, user?.id]);
 
-  // Handle different message types
+  // Handle message types
   const handleGameStateMessage = (message: WSStateUpdateMessage) => {
     if (message.gameState) {
       const clientGameState = convertWSGameStateToClient(message.gameState);
-      console.log("ser ne: ", message.gameState);
-      console.log("client ne: ", clientGameState);
       setGameState(clientGameState);
       setBitboardStates([clientGameState]);
       setIndexMoveHistory(0);
@@ -352,8 +440,8 @@ const GamePage: React.FC = () => {
 
     if (message.whiteTimeLeft !== undefined && message.blackTimeLeft !== undefined) {
       setPlayerTimes({
-        white: message.whiteTimeLeft * 1000,
-        black: message.blackTimeLeft * 1000
+        white: message.whiteTimeLeft,
+        black: message.blackTimeLeft
       });
     }
 
@@ -364,8 +452,7 @@ const GamePage: React.FC = () => {
     if (message.gameState) {
       const clientGameState = convertWSGameStateToClient(message.gameState);
       setGameState(clientGameState);
-
-      // Update bitboard states for replay
+      setMoveHistory(message.moveHistory ?? []);
       setBitboardStates(prev => [...prev, clientGameState]);
       setIndexMoveHistory(prev => prev + 1);
     }
@@ -389,10 +476,23 @@ const GamePage: React.FC = () => {
     }
   };
 
-  // Handle move
+  const handleDrawOfferMessage = (message: WSStateUpdateMessage) => {
+    if (message.offerId && message.offerFrom) {
+      setPendingDrawOffer({
+        offerId: message.offerId,
+        offerFrom: message.offerFrom
+      });
+      setShowDrawOfferDialog(true);
+    }
+  };
+
+  const handleDrawDeclinedMessage = (message: WSStateUpdateMessage) => {
+    console.log('Draw offer was declined');
+  };
+
   const handleMove = (from: Position, to: Position, promotion?: string) => {
     if (!wsConnected || !ws.current) {
-      console.error('❌ Cannot send move: WebSocket not connected');
+      console.error('Cannot send move: WebSocket not connected');
       return;
     }
 
@@ -404,9 +504,73 @@ const GamePage: React.FC = () => {
       toCol: to.col,
       ...(promotion && { promotion })
     };
-
-    console.log('📤 Sending move:', moveMessage);
     ws.current.send(JSON.stringify(moveMessage));
+  };
+
+  const handleResign = () => {
+    if (!wsConnected || !ws.current) {
+      console.error(' Cannot resign: WebSocket not connected');
+      return;
+    }
+    setShowResignConfirm(true);
+  };
+
+const confirmResign = () => {
+    const resignMessage = {
+      type: 'gameAction', 
+      action: 'resign'    
+    };
+
+    ws.current?.send(JSON.stringify(resignMessage));
+    setShowResignConfirm(false);
+};
+
+  const handleDrawOffer = () => {
+    if (!wsConnected || !ws.current) {
+      console.error(' Cannot offer draw: WebSocket not connected');
+      return;
+    }
+    setShowDrawConfirm(true);
+  };
+
+const confirmDrawOffer = () => {
+    const drawMessage = {
+      type: 'gameAction',
+      action: 'drawOffer'  
+    };
+
+    ws.current?.send(JSON.stringify(drawMessage));
+    setShowDrawConfirm(false);
+};
+
+const acceptDrawOffer = () => {
+    if (!pendingDrawOffer) return;
+
+    const acceptMessage = {
+      type: 'gameAction',
+      action: 'drawAccept',
+      offerId: pendingDrawOffer.offerId  
+    };
+
+    ws.current?.send(JSON.stringify(acceptMessage));
+    setShowDrawOfferDialog(false);
+    setPendingDrawOffer(null);
+};
+
+  const declineDrawOffer = () => {
+    if (!pendingDrawOffer) return;
+
+    const declineMessage = {
+      type: 'gameAction',
+      roomId: gameId,
+      playerId: user?.id,
+      action: 'drawDecline',
+      offerId: pendingDrawOffer.offerId
+    };
+
+    ws.current?.send(JSON.stringify(declineMessage));
+    setShowDrawOfferDialog(false);
+    setPendingDrawOffer(null);
   };
 
   // Get player info
@@ -417,13 +581,18 @@ const GamePage: React.FC = () => {
     ? players.find((p: PlayerData) => p.userId !== user.id)
     : null;
 
+  // Get username of player who made draw offer
+  const drawOfferPlayerUsername = pendingDrawOffer
+    ? players.find(p => p.userId === pendingDrawOffer.offerFrom)?.username || 'Unknown'
+    : '';
+
   // Determine player's color
   const myColor = myPlayer?.color || 'white';
 
   // Helper format time for Clock
   const formatTimeForClock = (timeInMs: number) => {
-    const minutes = Math.floor(timeInMs / 60000);
-    const seconds = Math.floor((timeInMs % 60000) / 1000);
+    const minutes = Math.floor(timeInMs / 60);
+    const seconds = Math.floor(timeInMs % 60);
     return { minutes, seconds };
   };
 
@@ -447,7 +616,7 @@ const GamePage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-          <div className="text-red-600 text-xl mb-4">❌ Error</div>
+          <div className="text-red-600 text-xl mb-4"> Error</div>
           <div className="text-gray-700 mb-4">{error}</div>
           <button
             onClick={() => window.location.reload()}
@@ -463,13 +632,6 @@ const GamePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Connection status */}
-        <div className={`mb-4 p-2 rounded text-sm ${wsConnected
-            ? 'bg-green-100 text-green-800'
-            : 'bg-red-100 text-red-800'
-          }`}>
-          {wsConnected ? '🟢 Connected' : '🔴 Disconnected'}
-        </div>
 
         <div className="grid grid-cols-12 gap-6">
           {/* Left sidebar */}
@@ -501,6 +663,66 @@ const GamePage: React.FC = () => {
                 </div>
               )}
             </div>
+            {gameStatus === 'playing' && (
+              <div className="bg-white border border-gray-300 rounded-lg p-3 mt-4 relative">
+                <div className="flex flex-col gap-2">
+                  {/* Draw button container */}
+                  <div className="relative">
+                    <button
+                      onClick={handleDrawOffer}
+                      disabled={!wsConnected}
+                      className="w-full px-4 py-2 bg-cyan-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      Đề nghị hòa
+                    </button>
+
+                    {/* Draw confirm tooltip */}
+                    <ConfirmTooltip
+                      isOpen={showDrawConfirm}
+                      title="Đề nghị hòa"
+                      message="Bạn có muốn gửi đề nghị hòa cho đối thủ?"
+                      onConfirm={confirmDrawOffer}
+                      onCancel={() => setShowDrawConfirm(false)}
+                      confirmText="Gửi đề nghị"
+                      cancelText="Hủy bỏ"
+                      confirmButtonClass="bg-blue-500 hover:bg-blue-600"
+                      position="right"
+                    />
+                  </div>
+
+                  {/* Resign button container */}
+                  <div className="relative">
+                    <button
+                      onClick={handleResign}
+                      disabled={!wsConnected}
+                      className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      Đầu hàng
+                    </button>
+
+                    {/* Resign confirm tooltip */}
+                    <ConfirmTooltip
+                      isOpen={showResignConfirm}
+                      title="Xác nhận đầu hàng"
+                      message="Bạn có chắc chắn muốn đầu hàng? Hành động này không thể hoàn tác."
+                      onConfirm={confirmResign}
+                      onCancel={() => setShowResignConfirm(false)}
+                      confirmText="Đầu hàng"
+                      cancelText="Hủy bỏ"
+                      confirmButtonClass="bg-red-500 hover:bg-red-600"
+                      position="right"
+                    />
+
+                    <DrawOfferDialog
+                      isOpen={showDrawOfferDialog}
+                      offerFromUsername={drawOfferPlayerUsername}
+                      onAccept={acceptDrawOffer}
+                      onDecline={declineDrawOffer}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Game board */}
@@ -515,6 +737,8 @@ const GamePage: React.FC = () => {
                   onClose={() => setShowDialog(false)}
                 />
               )}
+
+              {/* Draw Offer Dialog */}
 
               <div className="relative">
                 {gameState && (

@@ -16,9 +16,9 @@ const Clock = ({
 }: ClockProps) => {
   const [minutes, setMinutes] = React.useState(initialMinutes);
   const [seconds, setSeconds] = React.useState(initialSeconds);
-  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const timerRef = React.useRef<number | null>(null);
 
-  useEffect(() => {
+useEffect(() => {
     if (!isActive) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -27,33 +27,29 @@ const Clock = ({
       return;
     }
 
-    timerRef.current = setInterval(() => {
-      setSeconds(prevSeconds => {
-        if (prevSeconds > 0) {
-          return prevSeconds - 1;
-        } else {
-          setMinutes(prevMinutes => {
-            const newMinutes = prevMinutes - 1;
-            
-            if (newMinutes < 0) {
-              onTimeUp?.();
-              return 0;
-            }
-            
-            return newMinutes;
-          });
-          
-          return 59;
-        }
-      });
+    timerRef.current = window.setInterval(() => {
+      const totalSeconds = minutes * 60 + seconds;
+      
+      if (totalSeconds <= 0) {
+        onTimeUp?.();
+        return;
+      }
+
+      const newTotalSeconds = totalSeconds - 1;
+      const newMinutes = Math.floor(newTotalSeconds / 60);
+      const newSeconds = newTotalSeconds % 60;
+
+      setMinutes(newMinutes);
+      setSeconds(newSeconds);
     }, 1000);
 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [isActive, onTimeUp]);
+  }, [isActive, onTimeUp, minutes, seconds]);
 
   const formatTime = (min: number, sec: number) => {
     return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
