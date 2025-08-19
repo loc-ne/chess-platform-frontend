@@ -356,7 +356,8 @@ const GamePage: React.FC = () => {
   React.useEffect(() => {
     if (!gameId || !user?.id) return;
 
-    ws.current = new WebSocket('ws://localhost:3005/ws');
+    const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:3005/ws';
+    ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       setWsConnected(true);
