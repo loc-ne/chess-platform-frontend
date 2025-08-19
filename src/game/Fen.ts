@@ -50,10 +50,10 @@ export const FenUtils = {
 
     fenPiecesToBitboards(fenPieces: string): BitboardGame {
     const bitboards: BitboardGame = {
-      whitePawns: 0n, whiteRooks: 0n, whiteKnights: 0n,
-      whiteBishops: 0n, whiteQueens: 0n, whiteKing: 0n,
-      blackPawns: 0n, blackRooks: 0n, blackKnights: 0n,
-      blackBishops: 0n, blackQueens: 0n, blackKing: 0n
+      whitePawns: BigInt(0), whiteRooks: BigInt(0), whiteKnights: BigInt(0),
+      whiteBishops: BigInt(0), whiteQueens: BigInt(0), whiteKing: BigInt(0),
+      blackPawns: BigInt(0), blackRooks: BigInt(0), blackKnights: BigInt(0),
+      blackBishops: BigInt(0), blackQueens: BigInt(0), blackKing: BigInt(0)
     };
 
     const ranks = fenPieces.split('/');
@@ -66,7 +66,7 @@ export const FenUtils = {
           col += parseInt(char);
         } else {
           const bitPosition = row * 8 + col;
-          const bit = 1n << BigInt(bitPosition);
+          const bit = BigInt(1) << BigInt(bitPosition);
 
           switch (char) {
             case 'P': bitboards.whitePawns |= bit; break;
