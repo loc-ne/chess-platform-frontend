@@ -21,7 +21,7 @@ const LoginPage: React.FC = () => {
 
     React.useEffect(() => {
     if (user) {
-      router.replace('/home');
+      router.replace('/play/online');
     }
   }, [user, router]);
 

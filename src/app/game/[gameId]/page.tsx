@@ -392,6 +392,7 @@ const GamePage: React.FC = () => {
 
           case 'gameEnd':
             handleGameEndMessage(message);
+            console.log("mes: ", message);
             break;
 
           case 'drawOffer':
@@ -733,7 +734,7 @@ const acceptDrawOffer = () => {
                   isOpen={showDialog}
                   gameResult={gameResult}
                   onRematch={() => window.location.reload()}
-                  onNewGame={() => window.location.href = '/match'}
+                  onNewGame={() => window.location.href = '/play/online'}
                   onClose={() => setShowDialog(false)}
                 />
               )}
